@@ -167,8 +167,10 @@ def check_approaching(bot, job):
     
 
 def main():
+    with open('token.txt', 'r') as f:
+        first_line = f.readline().strip()
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater("422080493:AAHV9FT0Tsh6tc0mJjE0JCQU4PHvY3120NE")
+    updater = Updater(first_line)
 
     # Add cron jobs
     jobs = updater.job_queue
