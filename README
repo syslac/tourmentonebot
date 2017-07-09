@@ -1,0 +1,15 @@
+== TourmentoneBot ==
+
+Simple Telegram bot (in Python) to help keep track of upcoming concerts.
+
+=== Features ===
+
+ * /add command, to add new event; mandatory format is /add yyyy-mm-dd Artist@Venue
+ * /next command, to show the first 5 upcoming events
+ * Automatic reminder of shows within the same week, and on the same day of the event
+ * Records chat info, so should be okay to use personally and in one or more group chats, without confusion
+
+Can potentially obviously be used for deadlines not related to music
+
+=== Backend ===
+Simple sqlite table named `shows`, with schema (id PRIMARY, artist text, date text, place text, notified_week int, notified_day int, chat_id text)
