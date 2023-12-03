@@ -14,10 +14,13 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
+from telegram.ext import Updater, CallbackContext, ApplicationBuilder, CommandHandler, MessageHandler, filters, Job
+from telegram import Update
+import telegram
 import logging
 import sqlite3
 import datetime
+import asyncio
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -28,27 +31,27 @@ logger = logging.getLogger(__name__)
 
 # Define a few command handlers. These usually take the two arguments bot and
 # update. Error handlers also receive the raised TelegramError object in error.
-def start(bot, update):
-    update.message.reply_text("""Hi! 
+async def start(update : Update, context: CallbackContext):
+    await update.message.reply_text("""Hi! 
 I can help you keep track of upcoming concerts; type /help to see what I can do
     """)
 
-def help(bot, update):
-    update.message.reply_text("""
+async def help(update : Update, context: CallbackContext):
+    await update.message.reply_text("""
 Type /add yyyy-mm-dd Band@Place to add a new concert
 Type /next to get a list of the upcoming shows
 I will then remind you of approaching concerts one week before and on the same day.
 """)
 
 
-def echo(bot, update):
-    update.message.reply_text("Sorry, unrecognized command.")
+async def echo(update: Update, context: CallbackContext):
+    await update.message.reply_text("Sorry, unrecognized command.")
 
 
-def error(bot, update, error):
+async def error(update: Update, error):
     logger.warn('Update "%s" caused error "%s"' % (update, error))
 
-def next_shows (bot, update, **optional_data):
+async def next_shows (update: Update, context: CallbackContext):
     conn = sqlite3.connect('shows.sqlite')
     c = conn.cursor()
     chat_data = ''
@@ -68,15 +71,15 @@ def next_shows (bot, update, **optional_data):
 
     try:
         if (found_one):
-            update.message.reply_text(reply)
+            await update.message.reply_text(reply)
         else:
-            update.message.reply_text("No upcoming shows found")
+            await update.message.reply_text("No upcoming shows found")
     except:
         a = False
 
     conn.close()
 
-def add_show(bot, update, **optional_data):
+async def add_show(update: Update, context: CallbackContext):
     conn = sqlite3.connect('shows.sqlite')
     c = conn.cursor()
     chat_data = ''
@@ -103,7 +106,7 @@ def add_show(bot, update, **optional_data):
 
     conn.close()
 
-def check_approaching(bot, job):
+async def check_approaching(bot, job):
     conn = sqlite3.connect('shows.sqlite')
     c = conn.cursor()
     chat_data = ''
@@ -170,29 +173,30 @@ def main():
     with open('token.txt', 'r') as f:
         first_line = f.readline().strip()
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater(first_line)
+    updater = telegram.ext.Application.builder().token(first_line).build()
+
+    # on different commands - answer in Telegram
+    updater.add_handler(CommandHandler("start", start))
+    updater.add_handler(CommandHandler("help", help))
+    updater.add_handler(CommandHandler("next", next_shows))
+    updater.add_handler(CommandHandler("add", add_show))
+
+    # on noncommand i.e message - echo the message on Telegram
+    updater.add_handler(MessageHandler(filters.TEXT, echo, False))
+
+    # log all errors
+    updater.add_error_handler(error)
 
     # Add cron jobs
     jobs = updater.job_queue
     jobs.run_daily(check_approaching, datetime.time(7, 0, 0))
 
     # Get the dispatcher to register handlers
-    dp = updater.dispatcher
+    #dp = updater.dispatcher
 
-    # on different commands - answer in Telegram
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", help))
-    dp.add_handler(CommandHandler("next", next_shows, pass_user_data=True, pass_chat_data=True))
-    dp.add_handler(CommandHandler("add", add_show, pass_user_data=True, pass_chat_data=True))
-
-    # on noncommand i.e message - echo the message on Telegram
-    dp.add_handler(MessageHandler(Filters.text, echo))
-
-    # log all errors
-    dp.add_error_handler(error)
 
     # Start the Bot
-    updater.start_polling()
+    updater.run_polling()
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
